@@ -16,33 +16,18 @@ from motion.Learning import RBF
 rng = np.random.RandomState(1234)
 to_meters = 5.6444
 window = 60
-njoints = 31
+n_joints = 31
 
-""" Data """
-
-data_terrain_path = 'data/animations/*.bvh'
-data_terrain = list()
-for file_path in glob.glob(data_terrain_path):
-    if 'rest.bvh' not in file_path:
-        data_terrain.append(file_path)
-
-""" Load Terrain Patches """
-
-patches_database = np.load('patches.npz')
-patches = patches_database['X'].astype(np.float32)
-patches_coord = patches_database['C'].astype(np.float32)
-
-""" Processing Functions """
+#region Processing Functions
 
 
 def process_data(anim, phase, gait, type='flat'):
-    
     """ Do FK """
     global_xforms = Animation.transforms_global(anim)
     global_positions = global_xforms[:, :, :3, 3] / global_xforms[:, :, 3:, 3]
     global_rotations = Quaternions.from_transforms(global_xforms)
     
-    """ Extract Forward Direction """
+    # Extract Forward Direction
     
     sdr_l, sdr_r, hip_l, hip_r = 18, 25, 2, 7
     across = (
@@ -50,7 +35,7 @@ def process_data(anim, phase, gait, type='flat'):
         (global_positions[:, hip_l] - global_positions[:, hip_r]))
     across = across / np.sqrt((across**2).sum(axis=-1))[..., np.newaxis]
     
-    """ Smooth Forward Direction """
+    # Smooth Forward Direction
     
     direction_filterwidth = 20
     forward = filters.gaussian_filter1d(
@@ -63,7 +48,7 @@ def process_data(anim, phase, gait, type='flat'):
     root_rotation = Quaternions.between(forward,
                                         np.array([[0, 0, 1]]).repeat(len(forward), axis=0))[:, np.newaxis]
     
-    """ Local Space """
+    # Local Space
     
     local_positions = global_positions.copy()
     local_positions[:, :, 0] = local_positions[:, :, 0] - local_positions[:, 0:1, 0]
@@ -76,7 +61,7 @@ def process_data(anim, phase, gait, type='flat'):
     root_velocity = root_rotation[:-1] * (global_positions[1:, 0:1] - global_positions[:-1,0:1])
     root_rvelocity = Pivots.from_quaternions(root_rotation[1:] * -root_rotation[:-1]).ps
     
-    """ Foot Contacts """
+    # Foot Contacts
     
     fid_l, fid_r = np.array([4, 5]), np.array([9, 10])
     velfactor = np.array([0.02, 0.02])
@@ -91,12 +76,12 @@ def process_data(anim, phase, gait, type='flat'):
     feet_r_z = (global_positions[1:, fid_r, 2] - global_positions[:-1, fid_r, 2])**2
     feet_r = (((feet_r_x + feet_r_y + feet_r_z) < velfactor)).astype(np.float)
     
-    """ Phase """
+    # Phase
     
     dphase = phase[1:] - phase[:-1]
     dphase[dphase < 0] = (1.0-phase[:-1]+phase[1:])[dphase < 0]
     
-    """ Adjust Crouching Gait Value """
+    # Adjust Crouching Gait Value
     
     if type == 'flat':
         crouch_low, crouch_high = 80, 130
@@ -104,7 +89,7 @@ def process_data(anim, phase, gait, type='flat'):
         gait[:-1, 3] = 1 - np.clip((global_positions[:-1, head, 1] - 80) / (130 - 80), 0, 1)
         gait[-1, 3] = gait[-2, 3]
 
-    """ Start Windows """
+    # Start Windows
     
     Pc, Xc, Yc = [], [], []
     
@@ -143,12 +128,10 @@ def process_data(anim, phase, gait, type='flat'):
                 ]))
                                                 
     return np.array(Pc), np.array(Xc), np.array(Yc)
-    
 
-""" Sampling Patch Heightmap """    
 
 def patchfunc(P, Xp, hscale=3.937007874, vscale=3.0):
-    
+    """ Sampling Patch Heightmap """
     Xp = Xp / hscale + np.array([P.shape[1]//2, P.shape[2]//2])
     
     A = np.fmod(Xp, 1.0)
@@ -167,14 +150,13 @@ def patchfunc(P, Xp, hscale=3.937007874, vscale=3.0):
     
 
 def process_heights(anim, nsamples=10, type='flat'):
-    
     """ Do FK """
     
     global_xforms = Animation.transforms_global(anim)
     global_positions = global_xforms[:,:,:3,3] / global_xforms[:,:,3:,3]
     global_rotations = Quaternions.from_transforms(global_xforms)
     
-    """ Extract Forward Direction """
+    # Extract Forward Direction
     
     sdr_l, sdr_r, hip_l, hip_r = 18, 25, 2, 7
     across = (
@@ -182,7 +164,7 @@ def process_heights(anim, nsamples=10, type='flat'):
         (global_positions[:,hip_l] - global_positions[:,hip_r]))
     across = across / np.sqrt((across**2).sum(axis=-1))[...,np.newaxis]
     
-    """ Smooth Forward Direction """
+    # Smooth Forward Direction
     
     direction_filterwidth = 20
     forward = filters.gaussian_filter1d(
@@ -192,7 +174,7 @@ def process_heights(anim, nsamples=10, type='flat'):
     root_rotation = Quaternions.between(forward, 
         np.array([[0,0,1]]).repeat(len(forward), axis=0))[:,np.newaxis] 
 
-    """ Foot Contacts """
+    # Foot Contacts
     
     fid_l, fid_r = np.array([4,5]), np.array([9,10])
     velfactor = np.array([0.02, 0.02])
@@ -210,11 +192,11 @@ def process_heights(anim, nsamples=10, type='flat'):
     feet_l = np.concatenate([feet_l, feet_l[-1:]], axis=0)
     feet_r = np.concatenate([feet_r, feet_r[-1:]], axis=0)
     
-    """ Toe and Heel Heights """
+    # Toe and Heel Heights
     
     toe_h, heel_h = 4.0, 5.0
     
-    """ Foot Down Positions """
+    # Foot Down Positions
     
     feet_down = np.concatenate([
         global_positions[feet_l[:,0],fid_l[0]] - np.array([0, heel_h, 0]),
@@ -223,7 +205,7 @@ def process_heights(anim, nsamples=10, type='flat'):
         global_positions[feet_r[:,1],fid_r[1]] - np.array([0,  toe_h, 0])
     ], axis=0)
     
-    """ Foot Up Positions """
+    # Foot Up Positions
     
     feet_up = np.concatenate([
         global_positions[~feet_l[:,0],fid_l[0]] - np.array([0, heel_h, 0]),
@@ -232,7 +214,7 @@ def process_heights(anim, nsamples=10, type='flat'):
         global_positions[~feet_r[:,1],fid_r[1]] - np.array([0,  toe_h, 0])
     ], axis=0)
     
-    """ Down Locations """
+    # Down Locations
     
     feet_down_xz = np.concatenate([feet_down[:,0:1], feet_down[:,2:3]], axis=-1)
     feet_down_xz_mean = feet_down_xz.mean(axis=0)
@@ -240,34 +222,24 @@ def process_heights(anim, nsamples=10, type='flat'):
     feet_down_y_mean = feet_down_y.mean(axis=0)
     feet_down_y_std  = feet_down_y.std(axis=0)
         
-    """ Up Locations """
+    # Up Locations
         
     feet_up_xz = np.concatenate([feet_up[:,0:1], feet_up[:,2:3]], axis=-1)
     feet_up_y = feet_up[:,1:2]
     
     if len(feet_down_xz) == 0:
-    
-        """ No Contacts """
-    
+        # No Contacts
         terr_func = lambda Xp: np.zeros_like(Xp)[:,:1][np.newaxis].repeat(nsamples, axis=0)
-        
     elif type == 'flat':
-        
-        """ Flat """
-        
+        # Flat
         terr_func = lambda Xp: np.zeros_like(Xp)[:,:1][np.newaxis].repeat(nsamples, axis=0) + feet_down_y_mean
-    
     else:
-        
-        """ Terrain Heights """
-        
+        # Terrain Heights
         terr_down_y = patchfunc(patches, feet_down_xz - feet_down_xz_mean)
         terr_down_y_mean = terr_down_y.mean(axis=1)
         terr_down_y_std  = terr_down_y.std(axis=1)
         terr_up_y = patchfunc(patches, feet_up_xz - feet_down_xz_mean)
-        
-        """ Fitting Error """
-        
+        # Fitting Error
         terr_down_err = 0.1 * ((
             (terr_down_y - terr_down_y_mean[:,np.newaxis]) -
             (feet_down_y - feet_down_y_mean)[np.newaxis])**2)[...,0].mean(axis=1)
@@ -275,9 +247,7 @@ def process_heights(anim, nsamples=10, type='flat'):
         terr_up_err = (np.maximum(
             (terr_up_y - terr_down_y_mean[:,np.newaxis]) -
             (feet_up_y - feet_down_y_mean)[np.newaxis], 0.0)**2)[...,0].mean(axis=1)
-        
-        """ Jumping Error """
-        
+        # Jumping Error
         if type == 'jumpy':
             terr_over_minh = 5.0
             terr_over_err = (np.maximum(
@@ -286,10 +256,8 @@ def process_heights(anim, nsamples=10, type='flat'):
         else:
             terr_over_err = 0.0
         
-        """ Fitting Terrain to Walking on Beam """
-        
+        # Fitting Terrain to Walking on Beam
         if type == 'beam':
-
             beam_samples = 1
             beam_min_height = 40.0
 
@@ -314,11 +282,11 @@ def process_heights(anim, nsamples=10, type='flat'):
         else:
             terr_beam_err = 0.0
         
-        """ Final Fitting Error """
+        # Final Fitting Error
         
         terr = terr_down_err + terr_up_err + terr_over_err + terr_beam_err
         
-        """ Best Fitting Terrains """
+        # Best Fitting Terrains
         
         terr_ids = np.argsort(terr)[:nsamples]
         terr_patches = patches[terr_ids]
@@ -326,15 +294,14 @@ def process_heights(anim, nsamples=10, type='flat'):
             (patchfunc(terr_patches, Xp - feet_down_xz_mean) - 
             terr_down_y_mean[terr_ids][:,np.newaxis]) + feet_down_y_mean)
         
-        """ Terrain Fit Editing """
+        # Terrain Fit Editing
         
         terr_residuals = feet_down_y - terr_basic_func(feet_down_xz)
         terr_fine_func = [RBF(smooth=0.1, function='linear') for _ in range(nsamples)]
         for i in range(nsamples): terr_fine_func[i].fit(feet_down_xz, terr_residuals[i])
         terr_func = lambda Xp: (terr_basic_func(Xp) + np.array([ff(Xp) for ff in terr_fine_func]))
-        
-        
-    """ Get Trajectory Terrain Heights """
+
+    # Get Trajectory Terrain Heights
     
     root_offsets_c = global_positions[:,0]
     root_offsets_r = (-root_rotation[:,0] * np.array([[+25, 0, 0]])) + root_offsets_c
@@ -344,7 +311,7 @@ def process_heights(anim, nsamples=10, type='flat'):
     root_heights_r = terr_func(root_offsets_r[:,np.array([0,2])])[...,0]
     root_heights_l = terr_func(root_offsets_l[:,np.array([0,2])])[...,0]
     
-    """ Find Trajectory Heights at each Window """
+    # Find Trajectory Heights at each Window
     
     root_terrains = []
     root_averages = []
@@ -360,118 +327,133 @@ def process_heights(anim, nsamples=10, type='flat'):
     root_averages = np.swapaxes(np.array(root_averages), 0, 1)
     
     return root_terrains, root_averages
+#endregion
 
-""" Phases, Inputs, Outputs """
-    
-P, X, Y = [], [], []
-            
-for data in data_terrain:
-    
-    print('Processing Clip %s' % data)
-    
-    """ Data Types """
-    
-    if   'LocomotionFlat12_000' in data: type = 'jumpy'
-    elif 'NewCaptures01_000'    in data: type = 'flat'
-    elif 'NewCaptures02_000'    in data: type = 'flat'
-    elif 'NewCaptures03_000'    in data: type = 'jumpy'
-    elif 'NewCaptures03_001'    in data: type = 'jumpy'
-    elif 'NewCaptures03_002'    in data: type = 'jumpy'
-    elif 'NewCaptures04_000'    in data: type = 'jumpy'
-    elif 'WalkingUpSteps06_000' in data: type = 'beam'
-    elif 'WalkingUpSteps09_000' in data: type = 'flat'
-    elif 'WalkingUpSteps10_000' in data: type = 'flat'
-    elif 'WalkingUpSteps11_000' in data: type = 'flat'
-    elif 'Flat' in data: type = 'flat'
-    else: type = 'rocky'
-    
-    """ Load Data """
-    
-    anim, names, _ = BVH.load(data)
-    anim.offsets *= to_meters
-    anim.positions *= to_meters
-    anim = anim[::2]
 
-    """ Load Phase / Gait """
-    
-    phase = np.loadtxt(data.replace('.bvh', '.phase'))[::2]
-    gait = np.loadtxt(data.replace('.bvh', '.gait'))[::2]
+if __name__ == '__main__':
+    data_terrain_path = 'data/animations/*.bvh'
+    data_terrain = list()
+    for file_path in glob.glob(data_terrain_path):
+        if 'rest.bvh' not in file_path:
+            data_terrain.append(file_path)
 
-    """ Merge Jog / Run and Crouch / Crawl """
-    
-    gait = np.concatenate([
-        gait[:,0:1],
-        gait[:,1:2],
-        gait[:,2:3] + gait[:,3:4],
-        gait[:,4:5] + gait[:,6:7],
-        gait[:,5:6],
-        gait[:,7:8]
-    ], axis=-1)
+    # Load Terrain Patches
 
-    """ Preprocess Data """
-    
-    Pc, Xc, Yc = process_data(anim, phase, gait, type=type)
+    patches_database = np.load('patches.npz')
+    patches = patches_database['X'].astype(np.float32)
+    patches_coord = patches_database['C'].astype(np.float32)
 
-    with open(data.replace('.bvh', '_footsteps.txt'), 'r') as f:
-        footsteps = f.readlines()
-    
-    """ For each Locomotion Cycle fit Terrains """
-    
-    for li in range(len(footsteps)-1):
-    
-        curr, next = footsteps[li+0].split(' '), footsteps[li+1].split(' ')
-        
-        """ Ignore Cycles marked with '*' or not in range """
-        
-        if len(curr) == 3 and curr[2].strip().endswith('*'): continue
-        if len(next) == 3 and next[2].strip().endswith('*'): continue
-        if len(next) <  2: continue
-        if int(curr[0])//2-window < 0: continue
-        if int(next[0])//2-window >= len(Xc): continue 
-        
-        """ Fit Heightmaps """
-        
-        slc = slice(int(curr[0])//2-window, int(next[0])//2-window+1)
-        H, Hmean = process_heights(anim[
-            int(curr[0])//2-window:
-            int(next[0])//2+window+1], type=type)
+    # Phases, Inputs, Outputs
 
-        for h, hmean in zip(H, Hmean):
-            
-            Xh, Yh = Xc[slc].copy(), Yc[slc].copy()
-            
-            """ Reduce Heights in Input/Output to Match"""
-            
-            xo_s, xo_e = ((window*2)//10)*10+1, ((window*2)//10)*10+njoints*3+1
-            yo_s, yo_e = 8+(window//10)*4+1, 8+(window//10)*4+njoints*3+1
-            Xh[:,xo_s:xo_e:3] -= hmean[...,np.newaxis]
-            Yh[:,yo_s:yo_e:3] -= hmean[...,np.newaxis]
-            Xh = np.concatenate([Xh, h - hmean[...,np.newaxis]], axis=-1)
-            
-            """ Append to Data """
-            
-            P.append(np.hstack([0.0, Pc[slc][1:-1], 1.0]).astype(np.float32))
-            X.append(Xh.astype(np.float32))
-            Y.append(Yh.astype(np.float32))
-  
-""" Clip Statistics """
-  
-print('Total Clips: %i' % len(X))
-print('Shortest Clip: %i' % min(map(len,X)))
-print('Longest Clip: %i' % max(map(len,X)))
-print('Average Clip: %i' % np.mean(list(map(len,X))))
+    P, X, Y = [], [], []
 
-""" Merge Clips """
+    for data in data_terrain:
+        print('Processing Clip %s' % data)
 
-print('Merging Clips...')
+        # Data Types
+        if 'LocomotionFlat12_000' in data:
+            terrain_type = 'jumpy'
+        elif 'NewCaptures01_000' in data:
+            terrain_type = 'flat'
+        elif 'NewCaptures02_000' in data:
+            terrain_type = 'flat'
+        elif 'NewCaptures03_000'in data:
+            terrain_type = 'jumpy'
+        elif 'NewCaptures03_001' in data:
+            terrain_type = 'jumpy'
+        elif 'NewCaptures03_002' in data:
+            terrain_type = 'jumpy'
+        elif 'NewCaptures04_000' in data:
+            terrain_type = 'jumpy'
+        elif 'WalkingUpSteps06_000' in data:
+            terrain_type = 'beam'
+        elif 'WalkingUpSteps09_000' in data:
+            terrain_type = 'flat'
+        elif 'WalkingUpSteps10_000' in data:
+            terrain_type = 'flat'
+        elif 'WalkingUpSteps11_000' in data:
+            terrain_type = 'flat'
+        elif 'Flat' in data:
+            terrain_type = 'flat'
+        else:
+            terrain_type = 'rocky'
 
-Xun = np.concatenate(X, axis=0)
-Yun = np.concatenate(Y, axis=0)
-Pun = np.concatenate(P, axis=0)
+        # Load Data
+        anim, names, _ = BVH.load(data)
+        anim.offsets *= to_meters
+        anim.positions *= to_meters
+        anim = anim[::2]
 
-print(Xun.shape, Yun.shape, Pun.shape)
+        # Load Phase / Gait
+        phase = np.loadtxt(data.replace('.bvh', '.phase'))[::2]
+        gait = np.loadtxt(data.replace('.bvh', '.gait'))[::2]
 
-print('Saving Database...')
+        # Merge Jog / Run and Crouch / Crawl
+        gait = np.concatenate([
+            gait[:, 0:1],
+            gait[:, 1:2],
+            gait[:, 2:3] + gait[:, 3:4],
+            gait[:, 4:5] + gait[:, 6:7],
+            gait[:, 5:6],
+            gait[:, 7:8]
+        ], axis=-1)
 
-np.savez_compressed('database.npz', Xun=Xun, Yun=Yun, Pun=Pun)
+        # Pre-process Data
+        Pc, Xc, Yc = process_data(anim, phase, gait, type=terrain_type)
+
+        with open(data.replace('.bvh', '_footsteps.txt'), 'r') as f:
+            footsteps = f.readlines()
+
+        # For each Locomotion Cycle fit Terrains
+        for li in range(len(footsteps)-1):
+            curr, next = footsteps[li+0].split(' '), footsteps[li+1].split(' ')
+
+            # Ignore Cycles marked with '*' or not in range
+            if len(curr) == 3 and curr[2].strip().endswith('*'):
+                continue
+            if len(next) == 3 and next[2].strip().endswith('*'):
+                continue
+            if len(next) < 2:
+                continue
+            if int(curr[0])//2-window < 0:
+                continue
+            if int(next[0])//2-window >= len(Xc):
+                continue
+
+            # Fit Heightmaps
+            slc = slice(int(curr[0])//2-window, int(next[0])//2-window+1)
+            H, Hmean = process_heights(anim[
+                int(curr[0])//2-window:
+                int(next[0])//2+window+1], type=terrain_type)
+
+            for h, hmean in zip(H, Hmean):
+                Xh, Yh = Xc[slc].copy(), Yc[slc].copy()
+                # Reduce Heights in Input/Output to Match
+                xo_s, xo_e = ((window*2)//10) * 10 + 1, ((window*2)//10) * 10 + n_joints * 3 + 1
+                yo_s, yo_e = 8 + (window//10) * 4 + 1, 8 + (window//10) * 4 + n_joints * 3 + 1
+                Xh[:, xo_s:xo_e:3] -= hmean[..., np.newaxis]
+                Yh[:, yo_s:yo_e:3] -= hmean[..., np.newaxis]
+                Xh = np.concatenate([Xh, h - hmean[..., np.newaxis]], axis=-1)
+                # Append to Data
+                P.append(np.hstack([0.0, Pc[slc][1:-1], 1.0]).astype(np.float32))
+                X.append(Xh.astype(np.float32))
+                Y.append(Yh.astype(np.float32))
+
+    # Clip Statistics
+    print('Total Clips: %i' % len(X))
+    print('Shortest Clip: %i' % min(map(len, X)))
+    print('Longest Clip: %i' % max(map(len, X)))
+    print('Average Clip: %i' % np.mean(list(map(len, X))))
+
+    # Merge Clips
+    print('Merging Clips...')
+
+    Xun = np.concatenate(X, axis=0)
+    Yun = np.concatenate(Y, axis=0)
+    Pun = np.concatenate(P, axis=0)
+
+    print(Xun.shape, Yun.shape, Pun.shape)
+
+    print('Saving Database...')
+    np.savez_compressed('database.npz', Xun=Xun, Yun=Yun, Pun=Pun)
 
