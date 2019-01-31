@@ -1,16 +1,15 @@
 import sys
 import os
+import glob
 import numpy as np
-import scipy.interpolate as interpolate
-import scipy.ndimage.filters as filters
+from scipy import interpolate
+from scipy.ndimage import filters
 
-sys.path.append('./motion')
-
-import BVH as BVH
-import Animation as Animation
-from Quaternions import Quaternions
-from Pivots import Pivots
-from Learning import RBF
+from motion import BVH
+from motion import Animation
+from motion.Quaternions import Quaternions
+from motion.Pivots import Pivots
+from motion.Learning import RBF
 
 """ Options """
 
@@ -21,95 +20,11 @@ njoints = 31
 
 """ Data """
 
-data_terrain = [
-    './data/animations/LocomotionFlat01_000.bvh',
-    './data/animations/LocomotionFlat02_000.bvh',
-    './data/animations/LocomotionFlat02_001.bvh',
-    './data/animations/LocomotionFlat03_000.bvh',
-    './data/animations/LocomotionFlat04_000.bvh',
-    './data/animations/LocomotionFlat05_000.bvh',
-    './data/animations/LocomotionFlat06_000.bvh',
-    './data/animations/LocomotionFlat06_001.bvh',
-    './data/animations/LocomotionFlat07_000.bvh',
-    './data/animations/LocomotionFlat08_000.bvh',
-    './data/animations/LocomotionFlat08_001.bvh',
-    './data/animations/LocomotionFlat09_000.bvh',
-    './data/animations/LocomotionFlat10_000.bvh',
-    './data/animations/LocomotionFlat11_000.bvh',
-    './data/animations/LocomotionFlat12_000.bvh',
-
-    './data/animations/LocomotionFlat01_000_mirror.bvh',
-    './data/animations/LocomotionFlat02_000_mirror.bvh',
-    './data/animations/LocomotionFlat02_001_mirror.bvh',
-    './data/animations/LocomotionFlat03_000_mirror.bvh',
-    './data/animations/LocomotionFlat04_000_mirror.bvh',
-    './data/animations/LocomotionFlat05_000_mirror.bvh',
-    './data/animations/LocomotionFlat06_000_mirror.bvh',
-    './data/animations/LocomotionFlat06_001_mirror.bvh',
-    './data/animations/LocomotionFlat07_000_mirror.bvh',
-    './data/animations/LocomotionFlat08_000_mirror.bvh',
-    './data/animations/LocomotionFlat08_001_mirror.bvh',
-    './data/animations/LocomotionFlat09_000_mirror.bvh',
-    './data/animations/LocomotionFlat10_000_mirror.bvh',
-    './data/animations/LocomotionFlat11_000_mirror.bvh',
-    './data/animations/LocomotionFlat12_000_mirror.bvh',
-
-    './data/animations/WalkingUpSteps01_000.bvh',
-    './data/animations/WalkingUpSteps02_000.bvh',
-    './data/animations/WalkingUpSteps03_000.bvh',
-    './data/animations/WalkingUpSteps04_000.bvh',
-    './data/animations/WalkingUpSteps04_001.bvh',
-    './data/animations/WalkingUpSteps05_000.bvh',
-    './data/animations/WalkingUpSteps06_000.bvh',
-    './data/animations/WalkingUpSteps07_000.bvh',
-    './data/animations/WalkingUpSteps08_000.bvh',
-    './data/animations/WalkingUpSteps09_000.bvh',
-    './data/animations/WalkingUpSteps10_000.bvh',
-    './data/animations/WalkingUpSteps11_000.bvh',
-    './data/animations/WalkingUpSteps12_000.bvh',
-
-    './data/animations/WalkingUpSteps01_000_mirror.bvh',
-    './data/animations/WalkingUpSteps02_000_mirror.bvh',
-    './data/animations/WalkingUpSteps03_000_mirror.bvh',
-    './data/animations/WalkingUpSteps04_000_mirror.bvh',
-    './data/animations/WalkingUpSteps04_001_mirror.bvh',
-    './data/animations/WalkingUpSteps05_000_mirror.bvh',
-    './data/animations/WalkingUpSteps06_000_mirror.bvh',
-    './data/animations/WalkingUpSteps07_000_mirror.bvh',
-    './data/animations/WalkingUpSteps08_000_mirror.bvh',
-    './data/animations/WalkingUpSteps09_000_mirror.bvh',
-    './data/animations/WalkingUpSteps10_000_mirror.bvh',
-    './data/animations/WalkingUpSteps11_000_mirror.bvh',
-    './data/animations/WalkingUpSteps12_000_mirror.bvh',
-
-    './data/animations/NewCaptures01_000.bvh',
-    './data/animations/NewCaptures02_000.bvh',
-    './data/animations/NewCaptures03_000.bvh',
-    './data/animations/NewCaptures03_001.bvh',
-    './data/animations/NewCaptures03_002.bvh',
-    './data/animations/NewCaptures04_000.bvh',
-    './data/animations/NewCaptures05_000.bvh',
-    './data/animations/NewCaptures07_000.bvh',
-    './data/animations/NewCaptures08_000.bvh',
-    './data/animations/NewCaptures09_000.bvh',
-    './data/animations/NewCaptures10_000.bvh',
-    './data/animations/NewCaptures11_000.bvh',
-
-    './data/animations/NewCaptures01_000_mirror.bvh',
-    './data/animations/NewCaptures02_000_mirror.bvh',
-    './data/animations/NewCaptures03_000_mirror.bvh',
-    './data/animations/NewCaptures03_001_mirror.bvh',
-    './data/animations/NewCaptures03_002_mirror.bvh',
-    './data/animations/NewCaptures04_000_mirror.bvh',
-    './data/animations/NewCaptures05_000_mirror.bvh',
-    './data/animations/NewCaptures07_000_mirror.bvh',
-    './data/animations/NewCaptures08_000_mirror.bvh',
-    './data/animations/NewCaptures09_000_mirror.bvh',
-    './data/animations/NewCaptures10_000_mirror.bvh',
-    './data/animations/NewCaptures11_000_mirror.bvh',
-]
-
-#data_terrain = ['./data/animations/LocomotionFlat01_000.bvh']
+data_terrain_path = 'data/animations/*.bvh'
+data_terrain = list()
+for file_path in glob.glob(data_terrain_path):
+    if 'rest.bvh' not in file_path:
+        data_terrain.append(file_path)
 
 """ Load Terrain Patches """
 
@@ -119,57 +34,61 @@ patches_coord = patches_database['C'].astype(np.float32)
 
 """ Processing Functions """
 
+
 def process_data(anim, phase, gait, type='flat'):
     
     """ Do FK """
     global_xforms = Animation.transforms_global(anim)
-    global_positions = global_xforms[:,:,:3,3] / global_xforms[:,:,3:,3]
+    global_positions = global_xforms[:, :, :3, 3] / global_xforms[:, :, 3:, 3]
     global_rotations = Quaternions.from_transforms(global_xforms)
     
     """ Extract Forward Direction """
     
     sdr_l, sdr_r, hip_l, hip_r = 18, 25, 2, 7
     across = (
-        (global_positions[:,sdr_l] - global_positions[:,sdr_r]) + 
-        (global_positions[:,hip_l] - global_positions[:,hip_r]))
-    across = across / np.sqrt((across**2).sum(axis=-1))[...,np.newaxis]
+        (global_positions[:, sdr_l] - global_positions[:, sdr_r]) +
+        (global_positions[:, hip_l] - global_positions[:, hip_r]))
+    across = across / np.sqrt((across**2).sum(axis=-1))[..., np.newaxis]
     
     """ Smooth Forward Direction """
     
     direction_filterwidth = 20
     forward = filters.gaussian_filter1d(
-        np.cross(across, np.array([[0,1,0]])), direction_filterwidth, axis=0, mode='nearest')    
-    forward = forward / np.sqrt((forward**2).sum(axis=-1))[...,np.newaxis]
+        np.cross(across, np.array([[0, 1, 0]])),
+        direction_filterwidth,
+        axis=0,
+        mode='nearest')
+    forward = forward / np.sqrt((forward**2).sum(axis=-1))[..., np.newaxis]
 
-    root_rotation = Quaternions.between(forward, 
-        np.array([[0,0,1]]).repeat(len(forward), axis=0))[:,np.newaxis] 
+    root_rotation = Quaternions.between(forward,
+                                        np.array([[0, 0, 1]]).repeat(len(forward), axis=0))[:, np.newaxis]
     
     """ Local Space """
     
     local_positions = global_positions.copy()
-    local_positions[:,:,0] = local_positions[:,:,0] - local_positions[:,0:1,0]
-    local_positions[:,:,2] = local_positions[:,:,2] - local_positions[:,0:1,2]
+    local_positions[:, :, 0] = local_positions[:, :, 0] - local_positions[:, 0:1, 0]
+    local_positions[:, :, 2] = local_positions[:, :, 2] - local_positions[:, 0:1, 2]
     
     local_positions = root_rotation[:-1] * local_positions[:-1]
-    local_velocities = root_rotation[:-1] *  (global_positions[1:] - global_positions[:-1])
+    local_velocities = root_rotation[:-1] * (global_positions[1:] - global_positions[:-1])
     local_rotations = abs((root_rotation[:-1] * global_rotations[:-1])).log()
     
-    root_velocity = root_rotation[:-1] * (global_positions[1:,0:1] - global_positions[:-1,0:1])
+    root_velocity = root_rotation[:-1] * (global_positions[1:, 0:1] - global_positions[:-1,0:1])
     root_rvelocity = Pivots.from_quaternions(root_rotation[1:] * -root_rotation[:-1]).ps
     
     """ Foot Contacts """
     
-    fid_l, fid_r = np.array([4,5]), np.array([9,10])
+    fid_l, fid_r = np.array([4, 5]), np.array([9, 10])
     velfactor = np.array([0.02, 0.02])
     
-    feet_l_x = (global_positions[1:,fid_l,0] - global_positions[:-1,fid_l,0])**2
-    feet_l_y = (global_positions[1:,fid_l,1] - global_positions[:-1,fid_l,1])**2
-    feet_l_z = (global_positions[1:,fid_l,2] - global_positions[:-1,fid_l,2])**2
-    feet_l = (((feet_l_x + feet_l_y + feet_l_z) < velfactor)).astype(np.float)
+    feet_l_x = (global_positions[1:, fid_l, 0] - global_positions[:-1, fid_l, 0])**2
+    feet_l_y = (global_positions[1:, fid_l, 1] - global_positions[:-1, fid_l, 1])**2
+    feet_l_z = (global_positions[1:, fid_l, 2] - global_positions[:-1, fid_l, 2])**2
+    feet_l = ((feet_l_x + feet_l_y + feet_l_z) < velfactor).astype(np.float)
     
-    feet_r_x = (global_positions[1:,fid_r,0] - global_positions[:-1,fid_r,0])**2
-    feet_r_y = (global_positions[1:,fid_r,1] - global_positions[:-1,fid_r,1])**2
-    feet_r_z = (global_positions[1:,fid_r,2] - global_positions[:-1,fid_r,2])**2
+    feet_r_x = (global_positions[1:, fid_r, 0] - global_positions[:-1, fid_r, 0])**2
+    feet_r_y = (global_positions[1:, fid_r, 1] - global_positions[:-1, fid_r, 1])**2
+    feet_r_z = (global_positions[1:, fid_r, 2] - global_positions[:-1, fid_r, 2])**2
     feet_r = (((feet_r_x + feet_r_y + feet_r_z) < velfactor)).astype(np.float)
     
     """ Phase """
@@ -182,8 +101,8 @@ def process_data(anim, phase, gait, type='flat'):
     if type == 'flat':
         crouch_low, crouch_high = 80, 130
         head = 16
-        gait[:-1,3] = 1 - np.clip((global_positions[:-1,head,1] - 80) / (130 - 80), 0, 1)
-        gait[-1,3] = gait[-2,3]
+        gait[:-1, 3] = 1 - np.clip((global_positions[:-1, head, 1] - 80) / (130 - 80), 0, 1)
+        gait[-1, 3] = gait[-2, 3]
 
     """ Start Windows """
     

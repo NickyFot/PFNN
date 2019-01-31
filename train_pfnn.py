@@ -2,16 +2,15 @@ import sys
 import numpy as np
 import theano
 import theano.tensor as T
+
+from nn.Layer import Layer
+from nn.HiddenLayer import HiddenLayer
+from nn.BiasLayer import BiasLayer
+from nn.DropoutLayer import DropoutLayer
+from nn.ActivationLayer import ActivationLayer
+from nn.AdamTrainer import AdamTrainer
+
 theano.config.allow_gc = True
-
-sys.path.append('./nn')
-
-from Layer import Layer
-from HiddenLayer import HiddenLayer
-from BiasLayer import BiasLayer
-from DropoutLayer import DropoutLayer
-from ActivationLayer import ActivationLayer
-from AdamTrainer import AdamTrainer
 
 rng = np.random.RandomState(23456)
 
@@ -51,7 +50,7 @@ joint_weights = np.array([
 
 Xstd[w*10+j*3*0:w*10+j*3*1] = Xstd[w*10+j*3*0:w*10+j*3*1].mean() / (joint_weights * 0.1) # Pos
 Xstd[w*10+j*3*1:w*10+j*3*2] = Xstd[w*10+j*3*1:w*10+j*3*2].mean() / (joint_weights * 0.1) # Vel
-Xstd[w*10+j*3*2:          ] = Xstd[w*10+j*3*2:          ].mean() # Terrain
+Xstd[w*10+j*3*2:] = Xstd[w*10+j*3*2:].mean() # Terrain
 
 Ystd[0:2] = Ystd[0:2].mean() # Translational Velocity
 Ystd[2:3] = Ystd[2:3].mean() # Rotational Velocity
@@ -78,6 +77,7 @@ X = (X - Xmean) / Xstd
 Y = (Y - Ymean) / Ystd
 
 """ Phase Function Neural Network """
+
 
 class PhaseFunctionedNetwork(Layer):
     

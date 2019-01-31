@@ -1,39 +1,27 @@
 import os
 import sys
+import glob
 import numpy as np
-import scipy.ndimage as ndimage
-import scipy.misc as misc
+
+from scipy import ndimage
+from scipy import misc
 
 np.random.seed(2)
 
 """ Options """
 
-size     = 128
-sparsity =  15 
+size = 128
+sparsity = 15
 
 """ Data """
 
-heightmaps = [
-    './data/heightmaps/hmap_001_smooth.txt',
-    './data/heightmaps/hmap_002_smooth.txt',
-    './data/heightmaps/hmap_003_smooth.txt',
-    './data/heightmaps/hmap_004_smooth.txt',
-    './data/heightmaps/hmap_005_smooth.txt',
-    './data/heightmaps/hmap_006_smooth.txt',
-    './data/heightmaps/hmap_007_smooth.txt',
-    './data/heightmaps/hmap_009_smooth.txt',
-    './data/heightmaps/hmap_010_smooth.txt',
-    './data/heightmaps/hmap_011_smooth.txt',
-    './data/heightmaps/hmap_012_smooth.txt',
-    './data/heightmaps/hmap_013_smooth.txt',
-    './data/heightmaps/hmap_014_smooth.txt',
-]
+heightmaps = 'data/heightmaps/hmap_*_smooth.txt'
 
 """ Patches / Coordinates """
 
 X, C = [], []
 
-for fi, filename in enumerate(heightmaps):
+for fi, filename in enumerate(glob.glob(heightmaps)):
     
     H = np.loadtxt(filename)
     nsamples = (H.shape[0]*H.shape[1])//(sparsity*sparsity)
@@ -50,8 +38,8 @@ for fi, filename in enumerate(heightmaps):
         """ Find Patch """
         
         S = ndimage.interpolation.shift(H, (xi, yi), mode='reflect')[:size*2,:size*2]
-        S = S[::-1,:] if np.random.uniform() > 0.5 else S
-        S = S[:,::-1] if np.random.uniform() > 0.5 else S
+        S = S[::-1, :] if np.random.uniform() > 0.5 else S
+        S = S[:, ::-1] if np.random.uniform() > 0.5 else S
         S = ndimage.interpolation.rotate(S, r, reshape=False, mode='reflect')
         
         """ Extract Patch Area """
